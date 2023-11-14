@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import math
 import argparse
-from tracker import trackeo
+from tracker import trackeo_clases, get_corners, get_iou, separar_objetos
 import os
 
 # class KalmanFilter:
@@ -17,6 +17,7 @@ import os
 # 	def correct(self, coordX, coordY):
 # 		measured = np.array([[np.float32(coordX)], [np.float32(coordY)]])
 # 		self.kf.correct(measured)
+
 def ann_yolo(file, w, h):
     yolo_txt = open(file)
     detecciones = []
@@ -39,7 +40,7 @@ def ann_yolo(file, w, h):
         detecciones.append([objeto, [centrox, centroy, ancho, alto], confi])
     return detecciones
 
-def visualizar(im, lista, color):
+def visualizar_detecciones(im, lista, color):
     for i in range(len(lista)):
         x1 = int(lista[i][1][0] - (lista[i][1][2] / 2))
         y1 = int(lista[i][1][1] - (lista[i][1][3] / 2))
@@ -48,10 +49,38 @@ def visualizar(im, lista, color):
         cv2.rectangle(im, (x1, y1), (x2, y2), color, 1)
         cv2.putText(im, str(lista[i][0]), (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
 
+def visualizar_objeto(im, lista, color, clase):
+    for i in range(len(lista[clase])):
+        x1 = int(lista[clase][i][1][0] - (lista[clase][i][1][2] / 2))
+        y1 = int(lista[clase][i][1][1] - (lista[clase][i][1][3] / 2))
+        x2 = int(lista[clase][i][1][0] + (lista[clase][i][1][2] / 2))
+        y2 = int(lista[clase][i][1][1] + (lista[clase][i][1][3] / 2))
+        cv2.rectangle(im, (x1, y1), (x2, y2), color, 1)
+        cv2.putText(im, str(lista[clase][i][0]), (int((x1+x2)/2), int((y1+y2)/2)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+
+def filtrar_objetos(lista, thr):
+    borrar = []
+    for i in range(len(lista)):
+        j = 0
+        while j < len(lista):
+            if lista[i][0] == lista[j][0]:
+                iou = get_iou(get_corners(lista[i]), get_corners(lista[j]))
+                if i != j and iou > thr:
+                    borrar.append(j)
+            j += 1
+    i = len(lista)
+    while i > -1:
+        for j in range(len(borrar)):
+            if i == borrar[j]:
+                lista.pop(i)
+                break
+        i -= 1
+    return lista
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--video', default="/home/pablo.calvo/DATASET2/videos_apartamento/C027_JMG/TAB/cam2_KR1/20230424-172536-C027_JMG-TAB-0000-cam2_KR1.mp4")#required=True)
+parser.add_argument('--num_ob', default=31)
 args = parser.parse_args()
 
 video = cv2.VideoCapture(args.video)
@@ -67,6 +96,15 @@ umbral = 0.55 #Un objeto detectado es valido si la confianza es mayor del 88%
 objetos = []
 lista = []
 trackers = []
+for i in range(args.num_ob):
+    lista.append([])
+    trackers.append([])
+
+#eyeful contiene el numero de objetos máximos que deberían de aparecer de cada clase
+# eyeful = [1, 4, 1, 15, 5, 5, 2, 1, 1, 1, 1, 1, 5, 2, 1, ??(cupboard), ??(drawer), ??(bra), 1, 1, 1, ??(panties), ??(pants), 2, 1, 1, 5, 5, 5, 5, 5]
+eyeful = [1, 4, 1, 15, 5, 5, 2, 1, 1, 1, 1, 1, 5, 2, 1, 0, 0, 0, 1, 1, 1, 0, 0, 2, 1, 1, 5, 5, 5, 5, 5]
+trackers_class = (3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 19, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30)
+
 distanciaobjeto = 0 #distancia de movimiento para considerar un objeto
 numeroframe = int(0)
 
@@ -93,14 +131,16 @@ while video.isOpened():
             objetos = ann_yolo(file_yolo, ancho, alto)
         except:
             objetos = []
+        objetos = filtrar_objetos(objetos, 0.85)
 
-        lista, trackers = trackeo(frame, objetos, lista, numeroframe, 80, trackers)
+        lista, trackers = separar_objetos(frame, objetos, lista, numeroframe, 80, trackers, eyeful, trackers_class)
+        lista, trackers = trackeo_clases(frame, lista, numeroframe, trackers, trackers_class)
 
-        visualizar(frame, objetos, (255, 0, 255))
-        visualizar(frame, lista, (0, 255, 0))
+        # visualizar_detecciones(frame, objetos, (255, 0, 255))
+        visualizar_objeto(frame, lista, (0, 255, 0), 0)
         cv2.imshow('frame', frame)  # visualización del vídeo
 
-    chr = cv2.waitKey(1) & 0xFF
+    chr = cv2.waitKey(20) & 0xFF
     if chr == 27:  # Esc key to exit
         break
 
