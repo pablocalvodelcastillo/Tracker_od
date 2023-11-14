@@ -53,6 +53,8 @@ def get_corners(lista):
     return x1, y1, x2, y2
 
 def separar_objetos(im, objetos, lista, numeroframe, dist_min, trackers, eyeful, trackers_class):
+    if numeroframe == 1755:
+        None
     for i in range(len(objetos)):
         clase = objetos[i][0]
         distanciamin = dist_min
@@ -70,7 +72,7 @@ def separar_objetos(im, objetos, lista, numeroframe, dist_min, trackers, eyeful,
             if clase in trackers_class:
                 trackers[clase][indice_objetos].start(im, x1, y1, x2, y2)
         else:  # se crea un nuevo objeto ya que no se puede asociar, y se crea el tracker
-            if len(lista[clase]) <= eyeful[clase]:
+            if len(lista[clase]) < eyeful[clase]:
                 lista[clase].append([objetos[i][0], objetos[i][1], numeroframe, numeroframe])
                 if clase in trackers_class:
                     tracker = Tracker()
@@ -79,10 +81,10 @@ def separar_objetos(im, objetos, lista, numeroframe, dist_min, trackers, eyeful,
             else:
                 antiguo = numeroframe + 5
                 borrar = -1
-                for i in range(len(lista[clase])):
-                    if lista[clase][i][3] < antiguo:
-                        antiguo = lista[clase][i][3]
-                        borrar = i
+                for j in range(len(lista[clase])):
+                    if lista[clase][j][3] < antiguo:
+                        antiguo = lista[clase][j][3]
+                        borrar = j
                 lista[clase][borrar][1] = objetos[i][1]
                 lista[clase][borrar][2] = numeroframe
                 lista[clase][borrar][3] = numeroframe
@@ -94,7 +96,7 @@ def trackeo_clases(im, lista, numeroframe, trackers, trackers_class):
     for clase in range(len(lista)):
         if clase in trackers_class:
             for i in range(len(lista[clase])):
-                if lista[clase][i][3] < numeroframe-2:
+                if lista[clase][i][3] < numeroframe:
                     px1, py1, px2, py2 = trackers[clase][i].track(im)
                     lista[clase][i][1] = [int((px1+px2)/2), int((py1+py2)/2), int(px2-px1), int(py2-py1)]
         i = 0
