@@ -139,60 +139,64 @@ with open(json_file, "r") as i:
     data = json.load(i)
 pos_json = 0
 # fr_0_json = int(data['frames'][0]['filename'][-10:-4])
+stop = True
 
 if video.isOpened() == False:
     print("Error opening video  file")
 
 #Comienza a analizar el vídeo
 while video.isOpened():
-    ret, frame = video.read()
-    if ret == True:
-        frame = cv2.resize(frame,(1100, int(1100*alto/ancho)), interpolation=cv2.INTER_AREA) #ajustar tamaño de la imagen
-        numeroframe += 1
+    if stop:
+        ret, frame = video.read()
+        if ret == True:
+            frame = cv2.resize(frame,(1100, int(1100*alto/ancho)), interpolation=cv2.INTER_AREA) #ajustar tamaño de la imagen
+            numeroframe += 1
 
-        #Se guarda en la variable objetos las detecciones del frame actual de la forma [[classID, [bbox], confi], ...]
-        try:
-            file_yolo = name + "_" + str(numeroframe) + ".txt"
-            file_yolo = "%#06d.txt" % (numeroframe)
-            file_yolo = os.path.join(yolo, file_yolo)
-            objetos = ann_yolo(file_yolo, ancho, alto)
-        except:
-            objetos = []
+            #Se guarda en la variable objetos las detecciones del frame actual de la forma [[classID, [bbox], confi], ...]
+            try:
+                file_yolo = name + "_" + str(numeroframe) + ".txt"
+                file_yolo = "%#06d.txt" % (numeroframe)
+                file_yolo = os.path.join(yolo, file_yolo)
+                objetos = ann_yolo(file_yolo, ancho, alto)
+            except:
+                objetos = []
 
-        try:
-            objetos = []
-            if int(data['frames'][pos_json]['filename'][-10:-4]) == numeroframe:
-                pos_json += 1
-                coord = data['frames'][pos_json - 1]['od']
-                for j in range(len(coord)):
-                    objetos.append(
-                        [int(coord[j]['objectClass']), [int((coord[j]['bbox'][0]) * 1100),
-                         int((coord[j]['bbox'][1]) * 1100 * alto / ancho),
-                         int((coord[j]['bbox'][2]) * 1100),
-                         int((coord[j]['bbox'][3]) * 1100 * alto / ancho)], int(1)])
-        except:
-            None
+            try:
+                objetos = []
+                if int(data['frames'][pos_json]['filename'][-10:-4]) == numeroframe:
+                    pos_json += 1
+                    coord = data['frames'][pos_json - 1]['od']
+                    for j in range(len(coord)):
+                        objetos.append(
+                            [int(coord[j]['objectClass']), [int((coord[j]['bbox'][0]) * 1100),
+                             int((coord[j]['bbox'][1]) * 1100 * alto / ancho),
+                             int((coord[j]['bbox'][2]) * 1100),
+                             int((coord[j]['bbox'][3]) * 1100 * alto / ancho)], int(1)])
+            except:
+                None
 
-        objetos = filtrar_objetos(objetos, 0.85, 0.8, limites_objetos)
+            objetos = filtrar_objetos(objetos, 0.85, 0.8, limites_objetos)
 
-        # if numeroframe == 1:
-        #     print("CUIDADO, quitar líneas 141 y 142")
-        # for i in range(len(objetos)):
-        #     objetos[i][0] = 4
+            # if numeroframe == 1:
+            #     print("CUIDADO, quitar líneas 141 y 142")
+            # for i in range(len(objetos)):
+            #     objetos[i][0] = 4
 
-        lista, trackers = separar_objetos(frame, objetos, lista, numeroframe, 40, trackers, eyeful, trackers_class)
-        lista, trackers = trackeo_clases(frame, lista, numeroframe, trackers, trackers_class)
+            lista, trackers = separar_objetos(frame, objetos, lista, numeroframe, 40, trackers, eyeful, trackers_class)
+            lista, trackers = trackeo_clases(frame, lista, numeroframe, trackers, trackers_class)
 
-        # visualizar_detecciones(frame, objetos, (255, 0, 255))
-        # visualizar_objeto(frame, lista, (0, 255, 0), 0)
-        visualizar_objeto(frame, lista, (0, 255, 0), 4)
-        visualizar_objeto(frame, lista, (255, 255, 0), 26)
-        visualizar_objeto(frame, lista, (0, 255, 255), 8)
-        cv2.imshow('frame', frame)  # visualización del vídeo
+            # visualizar_detecciones(frame, objetos, (255, 0, 255))
+            # visualizar_objeto(frame, lista, (0, 255, 0), 0)
+            visualizar_objeto(frame, lista, (0, 255, 0), 4)
+            visualizar_objeto(frame, lista, (255, 255, 0), 26)
+            visualizar_objeto(frame, lista, (0, 255, 255), 8)
+            cv2.imshow('frame', frame)  # visualización del vídeo
 
     chr = cv2.waitKey(5) & 0xFF
     if chr == 27:  # Esc key to exit
         break
+    if chr == ord(' '):  # press space to stop the frame
+        stop = not stop
 
 video.release()
 cv2.destroyAllWindows()
