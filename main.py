@@ -4,6 +4,7 @@ import math
 import argparse
 from tracker import trackeo_clases, get_corners, get_iou, separar_objetos
 import os
+import json
 
 # class KalmanFilter:
 # 	kf=cv2.KalmanFilter(4,2)
@@ -126,10 +127,18 @@ limites_objetos = []
 for i in range(args.num_ob):
     limites_objetos.append([0, 0, 1100, int(1100*alto/ancho), 1100, 1100])
 
-limites_objetos[0] = [350, 200, 1100, 550, 100, 100] #Es de la clase 4 (plato)
+limites_objetos[4] = [350, 200, 1100, 550, 100, 100] #Es de la clase 4 (plato)
+limites_objetos[8] = [350, 200, 1100, 550, 100, 100] #Es de la clase 4 (plato)
+limites_objetos[26] = [350, 200, 1100, 550, 150, 150] #Es de la clase 4 (plato)
 
 # yolo = "/home/pablo.calvo/Dataset/DATASET2/Objects_COCO_EYEFUL/YOLO_EYEFUL/" + "C027_JMG-TAB-2" + "/labels"
 yolo = "/home/pablo.calvo/Videos2/RESULTS-obj-det/qualitative_results/CZZZ_MMR/plates_subset_cam2_LABELS/labels"
+
+json_file = "/home/pablo.calvo/Descargas/plates.json"
+with open(json_file, "r") as i:
+    data = json.load(i)
+pos_json = 0
+# fr_0_json = int(data['frames'][0]['filename'][-10:-4])
 
 if video.isOpened() == False:
     print("Error opening video  file")
@@ -149,19 +158,36 @@ while video.isOpened():
             objetos = ann_yolo(file_yolo, ancho, alto)
         except:
             objetos = []
+
+        try:
+            objetos = []
+            if int(data['frames'][pos_json]['filename'][-10:-4]) == numeroframe:
+                pos_json += 1
+                coord = data['frames'][pos_json - 1]['od']
+                for j in range(len(coord)):
+                    objetos.append(
+                        [int(coord[j]['objectClass']), [int((coord[j]['bbox'][0]) * 1100),
+                         int((coord[j]['bbox'][1]) * 1100 * alto / ancho),
+                         int((coord[j]['bbox'][2]) * 1100),
+                         int((coord[j]['bbox'][3]) * 1100 * alto / ancho)], int(1)])
+        except:
+            None
+
         objetos = filtrar_objetos(objetos, 0.85, 0.8, limites_objetos)
 
-        if numeroframe == 1:
-            print("CUIDADO, quitar líneas 141 y 142")
-        for i in range(len(objetos)):
-            objetos[i][0] = 4
+        # if numeroframe == 1:
+        #     print("CUIDADO, quitar líneas 141 y 142")
+        # for i in range(len(objetos)):
+        #     objetos[i][0] = 4
 
         lista, trackers = separar_objetos(frame, objetos, lista, numeroframe, 40, trackers, eyeful, trackers_class)
         lista, trackers = trackeo_clases(frame, lista, numeroframe, trackers, trackers_class)
 
         # visualizar_detecciones(frame, objetos, (255, 0, 255))
-        visualizar_objeto(frame, lista, (0, 255, 0), 0)
+        # visualizar_objeto(frame, lista, (0, 255, 0), 0)
         visualizar_objeto(frame, lista, (0, 255, 0), 4)
+        visualizar_objeto(frame, lista, (255, 255, 0), 26)
+        visualizar_objeto(frame, lista, (0, 255, 255), 8)
         cv2.imshow('frame', frame)  # visualización del vídeo
 
     chr = cv2.waitKey(5) & 0xFF
