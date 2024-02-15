@@ -27,3 +27,5 @@ asumiendo que se trata del mismo objetos para la detección de la misma clase co
 También se establece un límite de objetos por cada clase, borrando la detección más antigua si se supera el número de objetos almacenados.
 
 Finalmente, se realiza una predicción de los objetos almacenados que no hayan sido asociados (que no se detectan) en el frame actual.
+
+El IOU se emplea para eliminar detecciones erróneas (por ejemplo, 2 sillas que tienen en común la mayor parte del bbox, por defecto el 85%).
