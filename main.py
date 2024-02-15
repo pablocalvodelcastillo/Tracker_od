@@ -6,16 +6,17 @@ from tracker import trackeo_clases, get_corners, get_iou, separar_objetos
 import os
 import json
 
-# class KalmanFilter:
-# 	kf=cv2.KalmanFilter(4,2)
+# class KalmanFilter: #Filtro de kalman para tracking
+#   #Definición de parámetros (se deberían ajustar en función de cada objeto
+# 	kf = cv2.KalmanFilter(4,2)
 # 	kf.measurementMatrix=np.array([[1, 0, 0, 0], [0, 1, 0, 0]], np.float32)
 # 	kf.transitionMatrix=np.array([[1, 0, 1, 0], [0, 1, 0, 1], [0, 0, 1, 0], [0, 0, 0, 1]], np.float32)
 #
-# 	def predict(self):
+# 	def predict(self): #Función para predicción
 # 		predicted = self.kf.predict()
 # 		x, y= int(predicted[0]), int(predicted[1])
 # 		return x, y
-# 	def correct(self, coordX, coordY):
+# 	def correct(self, coordX, coordY): #Función para corregir con las medidas de una detección
 # 		measured = np.array([[np.float32(coordX)], [np.float32(coordY)]])
 # 		self.kf.correct(measured)
 
@@ -64,13 +65,13 @@ def filtrar_objetos(lista, thr_iou, thr_det, limites):
     for i in range(len(lista)):
         j = 0
         while j < len(lista):
-            if lista[i][0] == lista[j][0]:
-                iou = get_iou(get_corners(lista[i]), get_corners(lista[j]))
+            if lista[i][0] == lista[j][0]: #Si son la misma clase
+                iou = get_iou(get_corners(lista[i]), get_corners(lista[j])) #IOU entre objetos
                 if i != j and iou > thr_iou:
-                    borrar.append(j)
+                    borrar.append(j) #Se borra un objeto asumiendo que se trata del mismo
             j += 1
     i = len(lista)
-    while i > -1:
+    while i > -1: #Se borran los objetos asociados anteriormente
         for j in range(len(borrar)):
             if i == borrar[j]:
                 lista.pop(i)
@@ -78,7 +79,7 @@ def filtrar_objetos(lista, thr_iou, thr_det, limites):
         i -= 1
 
     i = 0
-    while i < len(lista):
+    while i < len(lista): #Comprobar si el objeto entra en los límites definidos para una clase concreta
         x1, y1, x2, y2 = get_corners(lista[i])
         clase = lista[i][0]
         if lista[i][2] < thr_det or x1 < limites[clase][0] or y1 < limites[clase][1] or x2 > limites[clase][2] or y2 > limites[clase][3] or lista[i][1][2] > limites[clase][4] or lista[i][1][3] > limites[clase][5]:
@@ -90,11 +91,12 @@ def filtrar_objetos(lista, thr_iou, thr_det, limites):
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--video', default="/home/pablo.calvo/DATASET2/videos_apartamento/C027_JMG/TAB/cam2_KR1/20230424-172536-C027_JMG-TAB-0000-cam2_KR1.mp4")#required=True)
+parser.add_argument('--video', default="/home/pablo.calvo/Videos2/alvaro.nieva/DISTRACTORS/20230714-135720-CZZZ_MMR-TAB-0000-cam2_KR1.mp4")#required=True)
 parser.add_argument('--num_ob', default=31)
+parser.add_argument('--json', default="/home/pablo.calvo/Descargas/plates.json")
 args = parser.parse_args()
 
-args.video = "/home/pablo.calvo/Videos2/alvaro.nieva/DISTRACTORS/20230714-135720-CZZZ_MMR-TAB-0000-cam2_KR1.mp4"
+# args.video = "/home/pablo.calvo/Videos2/alvaro.nieva/DISTRACTORS/20230714-135720-CZZZ_MMR-TAB-0000-cam2_KR1.mp4"
 video = cv2.VideoCapture(args.video)
 for i in range(len(args.video)):
     if args.video[i] == '/':
@@ -104,10 +106,11 @@ for i in range(len(args.video)):
 name = args.video[(barra + 1):(punto)]
 
 #Inicialización de variables
-umbral = 0.55 #Un objeto detectado es valido si la confianza es mayor del 88%
+umbral = 0.55 #Un objeto detectado es valido si la confianza es mayor del umbral
 objetos = []
 lista = []
 trackers = []
+#Inicializar una lista para cada clase
 for i in range(args.num_ob):
     lista.append([])
     trackers.append([])
@@ -122,23 +125,32 @@ alto = int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
 #eyeful contiene el numero de objetos máximos que deberían de aparecer de cada clase
 # eyeful = [1, 4, 1, 15, 5, 5, 2, 1, 1, 1, 1, 1, 5, 2, 1, ??(cupboard), ??(drawer), ??(bra), 1, 1, 1, ??(panties), ??(pants), 2, 1, 1, 5, 5, 5, 5, 5]
 eyeful = [1, 4, 1, 15, 5, 5, 2, 1, 1, 1, 1, 1, 5, 2, 1, 0, 0, 0, 1, 1, 1, 0, 0, 2, 1, 1, 5, 5, 5, 5, 5]
+
+#trackers_class contiene el ID del objeto para realizar el seguimiento en cada una de las posiciones
 trackers_class = (3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 19, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30)
+
+#Definir en cada objeto (por posición en el array) los límites: [x min, y min, x max, y max, ancho, alto]
 limites_objetos = []
 for i in range(args.num_ob):
-    limites_objetos.append([0, 0, 1100, int(1100*alto/ancho), 1100, 1100])
+    limites_objetos.append([0, 0, 1100, int(1100*alto/ancho), 1100, 1100]) #Valores por defecto
 
-limites_objetos[4] = [350, 200, 1100, 550, 100, 100] #Es de la clase 4 (plato)
-limites_objetos[8] = [350, 200, 1100, 550, 100, 100] #Es de la clase 4 (plato)
-limites_objetos[26] = [350, 200, 1100, 550, 150, 150] #Es de la clase 4 (plato)
+#Si se desea modificar alguna clase en particular
+limites_objetos[4] = [350, 200, 1100, 550, 100, 100] #Es de la clase 4 (plate)
+limites_objetos[8] = [350, 200, 1100, 550, 100, 100] #Es de la clase 8 (bowl)
+limites_objetos[26] = [350, 200, 1100, 550, 150, 150] #Es de la clase 26 (Soup plate)
 
-# yolo = "/home/pablo.calvo/Dataset/DATASET2/Objects_COCO_EYEFUL/YOLO_EYEFUL/" + "C027_JMG-TAB-2" + "/labels"
-yolo = "/home/pablo.calvo/Videos2/RESULTS-obj-det/qualitative_results/CZZZ_MMR/plates_subset_cam2_LABELS/labels"
+#En yolo se puede introducir la ubicación de las anotaciones en formato yolo. Habría que comentar la lectura en json
 
-json_file = "/home/pablo.calvo/Descargas/plates.json"
+yolo = "/home/pablo.calvo/Dataset/DATASET2/Objects_COCO_EYEFUL/YOLO_EYEFUL/" + "C027_JMG-TAB-2" + "/labels"
+# yolo = "/home/pablo.calvo/Videos2/RESULTS-obj-det/qualitative_results/CZZZ_MMR/plates_subset_cam2_LABELS/labels"
+
+
+#Anotaciones en formato JSON (de EYEFUL) con los objetos para realizar el seguimiento.
+json_file = args.json#"/home/pablo.calvo/Descargas/plates.json"
 with open(json_file, "r") as i:
     data = json.load(i)
 pos_json = 0
-# fr_0_json = int(data['frames'][0]['filename'][-10:-4])
+fr_0_json = int(data['frames'][0]['filename'][-10:-4])
 stop = True
 
 if video.isOpened() == False:
@@ -149,7 +161,7 @@ while video.isOpened():
     if stop:
         ret, frame = video.read()
         if ret == True:
-            frame = cv2.resize(frame,(1100, int(1100*alto/ancho)), interpolation=cv2.INTER_AREA) #ajustar tamaño de la imagen
+            frame = cv2.resize(frame, (1100, int(1100*alto/ancho)), interpolation=cv2.INTER_AREA) #ajustar tamaño de la imagen
             numeroframe += 1
 
             #Se guarda en la variable objetos las detecciones del frame actual de la forma [[classID, [bbox], confi], ...]
@@ -175,14 +187,12 @@ while video.isOpened():
             except:
                 None
 
+            #Filtrar en función de los límties definidos
             objetos = filtrar_objetos(objetos, 0.85, 0.8, limites_objetos)
 
-            # if numeroframe == 1:
-            #     print("CUIDADO, quitar líneas 141 y 142")
-            # for i in range(len(objetos)):
-            #     objetos[i][0] = 4
-
+            #Asociar las detecciones con las listas anteriores (actualmente por distancia entre los centros de los objetos.
             lista, trackers = separar_objetos(frame, objetos, lista, numeroframe, 40, trackers, eyeful, trackers_class)
+            #Tracking de los objetos
             lista, trackers = trackeo_clases(frame, lista, numeroframe, trackers, trackers_class)
 
             # visualizar_detecciones(frame, objetos, (255, 0, 255))

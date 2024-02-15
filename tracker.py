@@ -53,38 +53,37 @@ def get_corners(lista):
     return x1, y1, x2, y2
 
 def separar_objetos(im, objetos, lista, numeroframe, dist_min, trackers, eyeful, trackers_class):
-    if numeroframe == 1755:
-        None
     for i in range(len(objetos)):
         clase = objetos[i][0]
         distanciamin = dist_min
         x1, y1, x2, y2 = get_corners(objetos[i])
-        for j in range(len(lista[clase])):
+        for j in range(len(lista[clase])): #Asociar por distancia
             distx = abs(lista[clase][j][1][0] - objetos[i][1][0])
             disty = abs(lista[clase][j][1][1] - objetos[i][1][1])
             distancia = math.sqrt(pow(distx, 2) + pow(disty, 2))
             if distancia < distanciamin:
                 distanciamin = distancia
                 indice_objetos = j
-        if distanciamin < dist_min:  # se guarda la medida más cercana, se corrige el tracker
+        if distanciamin < dist_min:  #Se guarda la medida más cercana, se corrige el tracker
             lista[clase][indice_objetos][1] = objetos[i][1]
             lista[clase][indice_objetos][3] = numeroframe
             if clase in trackers_class:
                 trackers[clase][indice_objetos].start(im, x1, y1, x2, y2)
-        else:  # se crea un nuevo objeto ya que no se puede asociar, y se crea el tracker
-            if len(lista[clase]) < eyeful[clase]:
+        else:  #Se crea un nuevo objeto ya que no se puede asociar, y se crea el tracker
+            if len(lista[clase]) < eyeful[clase]: #Si no se pasa del límite de objetos definido para la clase
                 lista[clase].append([objetos[i][0], objetos[i][1], numeroframe, numeroframe])
                 if clase in trackers_class:
                     tracker = Tracker()
                     tracker.start(im, x1, y1, x2, y2)
                     trackers[clase].append(tracker)
-            else:
+            else: #Si hay más objetos que los que debería, se borra el no detectado más antiguo
                 antiguo = numeroframe + 5
                 borrar = -1
                 for j in range(len(lista[clase])):
                     if lista[clase][j][3] < antiguo:
                         antiguo = lista[clase][j][3]
-                        borrar = j
+                        borrar = j #Indice con el objeto para borrar
+                #Se sustituye por la detección actual
                 lista[clase][borrar][1] = objetos[i][1]
                 lista[clase][borrar][2] = numeroframe
                 lista[clase][borrar][3] = numeroframe
@@ -101,7 +100,7 @@ def trackeo_clases(im, lista, numeroframe, trackers, trackers_class):
                     lista[clase][i][1] = [int((px1+px2)/2), int((py1+py2)/2), int(px2-px1), int(py2-py1)]
         i = 0
         while i < len(lista[clase]):
-            if (numeroframe - lista[clase][i][3]) > 200:  # se borra el filtro, se desplazan las variables y se crean posiciones libres al final
+            if (numeroframe - lista[clase][i][3]) > 200:  #Se borra el filtro (si apareció hace más de 200 frames), se desplazan las variables y se crean posiciones libres al final
                 lista[clase].pop(i)
                 trackers[clase].pop(i)
             else:
